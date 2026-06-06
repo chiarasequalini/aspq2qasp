@@ -1,3 +1,5 @@
+#TODO: add an exists that doesn't do anything to deal with forall exists ... programs
+
 import fileinput
 import re
 import copy
@@ -53,40 +55,30 @@ for i in range(n):
 for i in range(n): #keeps only the atoms
     j = 0
     while j < len(bh[i]):
-        if "(" in bh[i][j]:
+        if "(" in bh[i][j] and not "{" in bh[i][j]:
             j += 1
         else:
             bh[i].pop(j)
 
-dom = copy.deepcopy(bh)
+dom = []
 for i in range(n):
-    j = 0
-    while j < len(dom[i]):
-        if not (any(char.isupper() for char in dom[i][j])): #removes variables (uppercase characters or strings beginning with uppercase characters)
-            dom[i][j] = dom[i][j].split(")")[0].split("(")[1]
-            j += 1
+    for j in range (len(bh[i])):
+        if not (any(char.isupper() for char in bh[i][j])): 
+            dom.append(bh[i][j].split(")")[0].split("(")[1])
         else:
-            dom[i].pop(j)
-
-for i in range(n): #replaces variables with all the possible values of the domain 
-    j = 0
-    while j < len(bh[i]):
-        if any(char.isupper() for char in bh[i][j]):
-            for k in range(len(dom[i])):
-                bh[i].append(bh[i][j].split("(")[0] + "(" + dom[i][k] + ")")
-            bh[i].pop(j)
-        else:
-            j += 1
-
-prefix = [[] for _ in range(n)]
-for i in range(n): #removes duplicates
-    for x in bh[i]:
-        if x not in prefix[i]:
-            prefix[i].append(x) 
+            hasVariables = True
 
 for i in range(n): #renames the atoms so contradicting facts won't be added to the program during the evaluation of the quantifiers
-    for j in range(len(prefix[i])):
-        prefix[i][j] = prefix[i][j].split("(")[0] + ("'" * (i+1)) + "(" + prefix[i][j].split("(")[1]
+    for j in range(len(bh[i])):
+        bh[i][j] = bh[i][j].split("(")[0] + ("'" * (i+1)) + "(" + bh[i][j].split("(")[1]
+
+for i in range(n): #removes duplicates
+    j = 0
+    while j < len(bh[i]):
+        if bh[i][j] in bh[i][0:j]:
+            bh[i].pop(j)
+        else:
+            j+=1
 
 #translation
 
@@ -100,38 +92,40 @@ translation += "\n"
 
 #add new atoms and check rules to avoid contradicting facts
 
-translation += "{"
-if len(prefix[n-1]) > 0:
-    for i in range(n-1):
-        for j in range(len(prefix[i])):
-            translation += prefix[i][j] + ";"
-    for j in range(len(prefix[n-1])-1):
-        translation += prefix[n-1][j] + ";"
-    translation += prefix[n-1][len(prefix[n-1])-1] + "}.\n"
-else:
-    for i in range(n-2):
-        for j in range(len(prefix[i])):
-            translation += prefix[i][j] + ";"
-    for j in range(len(prefix[n-2])-1):
-        translation += prefix[n-2][j] + ";"
-    translation += prefix[n-2][len(prefix[n-2])-1] + "}.\n"
-
+#if there's variables defines a domain for them
+if hasVariables:
+    translation += "dom(" + min(dom) + ".." + max(dom) + ").\n"
+    
 for i in range(n):
-    for j in range(len(prefix[i])):
-        translation += ":- " + prefix[i][j] + ", not " + re.split(r'\'+', prefix[i][j])[0] + re.split(r'\'+', prefix[i][j])[1] + ".\n"
-        translation += ":- " + re.split(r'\'+', prefix[i][j])[0] + re.split(r'\'+', prefix[i][j])[1] + ", not " + prefix[i][j] + ".\n"
+    for j in range(len(bh[i])):
+        if any(char.isupper() for char in bh[i][j]):
+            translation += "{" + bh[i][j] + "}" + " :- dom(" + bh[i][j].split("(")[1].split(")")[0] + ").\n"  
+        else:
+            translation += "{" + bh[i][j] + "}.\n"
 translation += "\n"
 
-#translation of the prefix
+for i in range(n):
+    for j in range(len(bh[i])):
+        translation += ":- " + bh[i][j] + ", not " + re.split(r'\'+', bh[i][j])[0] + re.split(r'\'+', bh[i][j])[1] + ".\n"
+        translation += ":- " + re.split(r'\'+', bh[i][j])[0] + re.split(r'\'+', bh[i][j])[1] + ", not " + bh[i][j] + ".\n"
+translation += "\n"
+
+#translation of the quantifiers 
 #ex: @exists P
 #becomes _exists(n, Bp). (expanded)
 
 for i in range(n):
-    for j in range(len(prefix[i])):
+    for j in range(len(bh[i])):
         if "exists" in subp[i][0]:
-            translation += "_exists(" + str(i+1) + "," + prefix[i][j] + ").\n"
-        else:
-            translation += "_forall(" + str(i+1) + "," + prefix[i][j] + ").\n"
+            if any(char.isupper() for char in bh[i][j]):
+                translation += "_exists(" + str(i+1) + "," + bh[i][j] + ") :- dom(" + bh[i][j].split("(")[1].split(")")[0] + ").\n"
+            else:
+                translation += "_exists(" + str(i+1) + "," + bh[i][j] + ").\n"
+        else: 
+            if any(char.isupper() for char in bh[i][j]):
+                translation += "_forall(" + str(i+1) + "," + bh[i][j] + ") :- dom(" + bh[i][j].split("(")[1].split(")")[0] + ").\n"
+            else:
+                translation += "_forall(" + str(i+1) + "," + bh[i][j] + ").\n"
 
 #output
 
