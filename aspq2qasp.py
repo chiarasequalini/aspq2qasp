@@ -1,5 +1,3 @@
-#TODO: add an exists that doesn't do anything to deal with forall exists ... programs
-
 import fileinput
 import re
 import copy
@@ -39,12 +37,17 @@ while j < len(source):
         subp[n-1][1] += source[j] 
     j += 1   
 
-for i in range(n):
-    if "exists" in subp[i][0] and (i+1) % 2 == 0:
-        raise ValueError("exists quantifier at even level is not accepted by qasp")
-    if "forall" in subp[i][0] and (i+1) % 2 != 0:
-        raise ValueError("forall quantifier at odd level is not accepted by qasp")
-    
+needsShift = False
+if "forall" in subp[0][0]: #handles forall,exists,forall,exists... programs
+    needsShift = True
+    temp = [['' for _ in range(2)] for _ in range(n+1)]
+    temp[0][0] = "@exists"
+    temp[0][1] = "shift.\n"
+    for i in range(n):
+        for j in range(2):
+            temp[i+1][j] = subp[i][j]
+    subp = copy.deepcopy(temp)
+
 #finding the herbrand base of each subprogram 
 
 bh = []
@@ -70,7 +73,7 @@ for i in range(n):
 
 for i in range(n): #renames the atoms so contradicting facts won't be added to the program during the evaluation of the quantifiers
     for j in range(len(bh[i])):
-        bh[i][j] = bh[i][j].split("(")[0] + ("'" * (i+1)) + "(" + bh[i][j].split("(")[1]
+        bh[i][j] = bh[i][j].split("(")[0] + str(i+1) + "(" + bh[i][j].split("(")[1]
 
 for i in range(n): #removes duplicates
     j = 0
@@ -92,7 +95,6 @@ translation += "\n"
 
 #add new atoms and check rules to avoid contradicting facts
 
-#if there's variables defines a domain for them
 if hasVariables:
     translation += "dom(" + min(dom) + ".." + max(dom) + ").\n"
     
@@ -106,13 +108,16 @@ translation += "\n"
 
 for i in range(n):
     for j in range(len(bh[i])):
-        translation += ":- " + bh[i][j] + ", not " + re.split(r'\'+', bh[i][j])[0] + re.split(r'\'+', bh[i][j])[1] + ".\n"
-        translation += ":- " + re.split(r'\'+', bh[i][j])[0] + re.split(r'\'+', bh[i][j])[1] + ", not " + bh[i][j] + ".\n"
+        translation += ":- " + bh[i][j] + ", not " + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[0] + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[1] + ".\n"
+        translation += ":- " + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[0] + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[1] + ", not " + bh[i][j] + ".\n"
 translation += "\n"
 
 #translation of the quantifiers 
 #ex: @exists P
 #becomes _exists(n, Bp). (expanded)
+
+if needsShift:
+    translation += "_exists(1,shift).\n"
 
 for i in range(n):
     for j in range(len(bh[i])):
