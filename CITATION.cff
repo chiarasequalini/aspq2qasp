@@ -5,7 +5,7 @@ authors:
   given-names: "Chiara"
   orcid: "https://orcid.org/0009-0004-4507-3905"
 title: "aspq2qasp"
-version: 1.0.0
+version: 1.0.2
 doi: 10.5281/zenodo.20505166
 date-released: 2026-06-02
 url: "https://github.com/chiarasequalini/aspq2qasp"
