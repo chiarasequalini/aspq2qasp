@@ -1,3 +1,5 @@
+#TODO: change shift to work with any quantifier at wrong level, even in the middle of the program
+
 import fileinput
 import re
 import copy
@@ -7,6 +9,7 @@ import copy
 source = []
 n = 0 #number of subprograms
 pos = [] #to track the lines at which each subprogram starts
+hasVariables = False 
 
 i = 0
 for line in fileinput.input(encoding="utf-8"):
@@ -27,7 +30,8 @@ while i < n:
         if "@" in source[j]:
             subp[i-1][0] += source[j] 
         else:
-            subp[i-1][1] += source[j] 
+            if not "%" in source[j]:
+                subp[i-1][1] += source[j] 
         j += 1
     i += 1    
 while j < len(source):
@@ -52,36 +56,34 @@ if "forall" in subp[0][0]: #handles forall,exists,forall,exists... programs
 
 bh = []
 for i in range(n): 
-    temp = re.split(r'[.,\|:\-\s]+', subp[i][1])
+    temp = re.split(r'(?:[.|\s]|,\s|:\-)+', subp[i][1])
     bh.append(temp)
 
 for i in range(n): #keeps only the atoms
     j = 0
     while j < len(bh[i]):
-        if "(" in bh[i][j] and not "{" in bh[i][j]:
+        if "(" in bh[i][j] and not ("{" in bh[i][j] or "}" in bh[i][j]):
             j += 1
         else:
             bh[i].pop(j)
+
+for i in range(n): #removes duplicates
+    bh[i] = list(set(bh[i]))
 
 dom = []
 for i in range(n):
     for j in range (len(bh[i])):
         if not (any(char.isupper() for char in bh[i][j])): 
-            dom.append(bh[i][j].split(")")[0].split("(")[1])
+            vars = re.split(r'[(),+-]+', bh[i][j])
+            vars = [x for x in vars if x.strip()]
+            for x in vars:
+                dom.append(x)
         else:
             hasVariables = True
 
 for i in range(n): #renames the atoms so contradicting facts won't be added to the program during the evaluation of the quantifiers
     for j in range(len(bh[i])):
-        bh[i][j] = bh[i][j].split("(")[0] + str(i+1) + "(" + bh[i][j].split("(")[1]
-
-for i in range(n): #removes duplicates
-    j = 0
-    while j < len(bh[i]):
-        if bh[i][j] in bh[i][0:j]:
-            bh[i].pop(j)
-        else:
-            j+=1
+        bh[i][j] = bh[i][j].split("(")[0] + str(i+1) + "(" + bh[i][j].split("(",1)[1]
 
 #translation
 
@@ -95,18 +97,29 @@ translation += "\n"
 
 #add new atoms and check rules to avoid contradicting facts
 
+dom =  list(set(dom))
+
 if hasVariables:
-    translation += "dom(" + min(dom) + ".." + max(dom) + ").\n"
+    for x in dom:
+        translation += "dom(" + x + "). "
+    translation += "\n"
     
 for i in range(n):
     for j in range(len(bh[i])):
         if any(char.isupper() for char in bh[i][j]):
-            translation += "{" + bh[i][j] + "}" + " :- dom(" + bh[i][j].split("(")[1].split(")")[0] + ").\n"  
+            translation += "{" + bh[i][j] + "}" + " :- "
+            vars = re.split(r'[(),+-]+', bh[i][j])
+            vars = [x for x in vars if x.strip()]
+            vars = [x for x in vars if x[0].isupper()]
+            vars = list(set(vars))
+            for k in range(len(vars)-1):
+                translation += "dom(" + vars[k] + "), "
+            translation += "dom(" + vars[-1] + ").\n"
         else:
             translation += "{" + bh[i][j] + "}.\n"
 translation += "\n"
 
-for i in range(n):
+for i in range(n): #check rules
     for j in range(len(bh[i])):
         translation += ":- " + bh[i][j] + ", not " + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[0] + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[1] + ".\n"
         translation += ":- " + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[0] + re.split(r'[0-9]+', bh[i][j], maxsplit=1)[1] + ", not " + bh[i][j] + ".\n"
@@ -121,14 +134,21 @@ if needsShift:
 
 for i in range(n):
     for j in range(len(bh[i])):
-        if "exists" in subp[i][0]:
-            if any(char.isupper() for char in bh[i][j]):
-                translation += "_exists(" + str(i+1) + "," + bh[i][j] + ") :- dom(" + bh[i][j].split("(")[1].split(")")[0] + ").\n"
+        if any(char.isupper() for char in bh[i][j]):
+            vars = re.split(r'[(),+-]+', bh[i][j])
+            vars = [x for x in vars if x.strip()]
+            vars = [x for x in vars if x[0].isupper()]
+            vars = list(set(vars))
+            if "exists" in subp[i][0]:
+                translation += "_exists(" + str(i+1) + "," + bh[i][j] + ") :- " 
             else:
-                translation += "_exists(" + str(i+1) + "," + bh[i][j] + ").\n"
-        else: 
-            if any(char.isupper() for char in bh[i][j]):
-                translation += "_forall(" + str(i+1) + "," + bh[i][j] + ") :- dom(" + bh[i][j].split("(")[1].split(")")[0] + ").\n"
+                translation += "_forall(" + str(i+1) + "," + bh[i][j] + ") :- "
+            for k in range(len(vars)-1):
+                translation += "dom(" + vars[k] + "), "
+            translation += "dom(" + vars[-1] + ").\n"
+        else:
+            if "exists" in subp[i][0]:
+                translation += "_exists(" + str(i+1) + "," + bh[i][j] + ").\n" 
             else:
                 translation += "_forall(" + str(i+1) + "," + bh[i][j] + ").\n"
 
