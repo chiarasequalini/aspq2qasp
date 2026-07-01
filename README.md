@@ -6,3 +6,7 @@ Script to translate ASP(Q) programs into QASP. Compatible with the solvers [PyQA
 Where `<file>` is a .aspq file. 
 
 If a file name is not specified, the program reads from stdin. 
+
+N.B.: for the parser to work correctly, there must be no internal spaces in the atoms:
+ex A(X,Y) is correct, A(X, Y) isn't. 
+A comma followed by a space must be used only for conjuction in the body of the rules. 
