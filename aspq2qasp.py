@@ -56,7 +56,10 @@ if "forall" in subp[0][0]: #handles forall,exists,forall,exists... programs
 
 bh = []
 for i in range(n): 
-    temp = re.split(r'(?:[.|\s]|,\s|:\-)+', subp[i][1])
+    if re.search(r'\(\w+,\s*\w+\)', subp[i][1]) != None:
+        temp = re.split(r'[.:\-]+', subp[i][1])
+    else:
+        temp = re.split(r'(?:[.|\s]|,\s|:\-)+', subp[i][1])
     bh.append(temp)
 
 for i in range(n): #keeps only the atoms
