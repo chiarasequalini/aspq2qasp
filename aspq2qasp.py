@@ -56,19 +56,7 @@ if "forall" in subp[0][0]: #handles forall,exists,forall,exists... programs
 
 bh = []
 for i in range(n): 
-    if re.search(r'\(\w+,\s*\w+\)', subp[i][1]) != None:
-        temp = re.split(r'[.:\-]+', subp[i][1])
-    else:
-        temp = re.split(r'(?:[.|\s]|,\s|:\-)+', subp[i][1])
-    bh.append(temp)
-
-for i in range(n): #keeps only the atoms
-    j = 0
-    while j < len(bh[i]):
-        if "(" in bh[i][j] and not ("{" in bh[i][j] or "}" in bh[i][j]):
-            j += 1
-        else:
-            bh[i].pop(j)
+    bh.append(re.findall(r'\w+\([^)]+\)', subp[i][1]))
 
 for i in range(n): #removes duplicates
     bh[i] = list(set(bh[i]))
@@ -77,12 +65,14 @@ dom = []
 for i in range(n):
     for j in range (len(bh[i])):
         if not (any(char.isupper() for char in bh[i][j])): 
-            vars = re.split(r'[(),+-]+', bh[i][j])
+            vars = re.split(r'[\s(),+-]+', bh[i][j])
             vars = [x for x in vars if x.strip()]
             for x in vars:
                 dom.append(x)
         else:
             hasVariables = True
+
+dom =  list(set(dom))
 
 for i in range(n): #renames the atoms so contradicting facts won't be added to the program during the evaluation of the quantifiers
     for j in range(len(bh[i])):
@@ -96,11 +86,8 @@ translation = ""
 
 for i in range(n):
     translation += subp[i][1]
-translation += "\n"
 
 #add new atoms and check rules to avoid contradicting facts
-
-dom =  list(set(dom))
 
 if hasVariables:
     for x in dom:
@@ -111,9 +98,9 @@ for i in range(n):
     for j in range(len(bh[i])):
         if any(char.isupper() for char in bh[i][j]):
             translation += "{" + bh[i][j] + "}" + " :- "
-            vars = re.split(r'[(),+-]+', bh[i][j])
+            vars = re.split(r'[\s(),+-]+', bh[i][j])
             vars = [x for x in vars if x.strip()]
-            vars = [x for x in vars if x[0].isupper()]
+            vars = [x for x in vars if x[0].isupper()] 
             vars = list(set(vars))
             for k in range(len(vars)-1):
                 translation += "dom(" + vars[k] + "), "
@@ -130,7 +117,7 @@ translation += "\n"
 
 #translation of the quantifiers 
 #ex: @exists P
-#becomes _exists(n, Bp). (expanded)
+#becomes _exists(n, Bp). 
 
 if needsShift:
     translation += "_exists(1,shift).\n"
@@ -138,7 +125,7 @@ if needsShift:
 for i in range(n):
     for j in range(len(bh[i])):
         if any(char.isupper() for char in bh[i][j]):
-            vars = re.split(r'[(),+-]+', bh[i][j])
+            vars = re.split(r'[\s(),+-]+', bh[i][j])
             vars = [x for x in vars if x.strip()]
             vars = [x for x in vars if x[0].isupper()]
             vars = list(set(vars))
