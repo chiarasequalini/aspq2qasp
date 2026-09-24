@@ -1,5 +1,3 @@
-#TODO: change shift to work with any quantifier at wrong level, even in the middle of the program
-
 import fileinput
 import re
 import copy
@@ -51,6 +49,28 @@ if "forall" in subp[0][0]: #handles forall,exists,forall,exists... programs
         for j in range(2):
             temp[i+1][j] = subp[i][j]
     subp = copy.deepcopy(temp)
+    n += 1
+
+midShift = False #handles situations where two consecutive subprograms have the same quantifier
+midShiftPos = []
+for i in range(n):
+    if subp[i][0] == subp[i+1][0]:
+        midShift = True
+        midShiftPos.append(i+2)  
+        temp = [['' for _ in range(2)] for _ in range(n+1)]
+        for j in range(i+1):
+            temp[j][0] = subp[j][0]
+            temp[j][1] = subp[j][1]
+        if subp[i][0] == "@exists":    
+            temp[i+1][0] = "@forall"
+        else:
+            temp[i+1][0] = "@exists"
+        temp[i+1][1] = "shift.\n"
+        for j in range(i+1,n):
+            temp[j+1][0] = subp[j][0]
+            temp[j+1][1] = subp[j][1]
+        subp = copy.deepcopy(temp)    
+        n += 1
 
 #finding the herbrand base of each subprogram 
 
@@ -121,6 +141,13 @@ translation += "\n"
 
 if needsShift:
     translation += "_exists(1,shift).\n"
+
+if midShift:
+    for i in range(len(midShiftPos)):
+        if midShiftPos[i] == "@exists":
+            translation += "_exists(" + str(midShiftPos[i]) + ",shift).\n"
+        else:
+            translation += "_forall(" + str(midShiftPos[i]) + ",shift).\n"
 
 for i in range(n):
     for j in range(len(bh[i])):
